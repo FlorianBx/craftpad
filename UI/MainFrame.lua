@@ -1,7 +1,22 @@
--- Main UI Frame with scrollable list
-local FRAME_WIDTH = 400
+-- Main UI Frame with split-view: list + detail panel
+local FRAME_WIDTH = 800
 local FRAME_HEIGHT = 500
-local ROW_HEIGHT = 20
+local LIST_WIDTH = 350
+local DETAIL_WIDTH = 400
+local ROW_HEIGHT = 24
+local ICON_SIZE = 20
+
+local selectedRow = nil
+local selectedItemData = nil
+
+-- Quality colors (WoW standard)
+local QUALITY_COLORS = {
+    [0] = {r = 0.62, g = 0.62, b = 0.62}, -- Poor (gray)
+    [1] = {r = 1.0, g = 1.0, b = 1.0},    -- Common (white)
+    [2] = {r = 0.12, g = 1.0, b = 0.0},   -- Uncommon (green)
+    [3] = {r = 0.0, g = 0.44, b = 0.87},  -- Rare (blue)
+    [4] = {r = 0.64, g = 0.21, b = 0.93}, -- Epic (purple)
+}
 
 function Craftpad.UI.CreateMainFrame()
     -- Main Frame
@@ -41,23 +56,185 @@ function Craftpad.UI.CreateMainFrame()
     local itemCount = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     itemCount:SetPoint("TOP", title, "BOTTOM", 0, -5)
     local count = Craftpad.Data.GetItemCount()
-    itemCount:SetText(count .. " items available")
+    itemCount:SetText(count .. " items available - Click an item to view crafting details")
 
-    -- Scroll Frame
-    local scrollFrame = CreateFrame("ScrollFrame", "CraftpadScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -70)
-    scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 20)
+    -- LEFT PANEL: List of items
+    local listPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    listPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -70)
+    listPanel:SetSize(LIST_WIDTH, FRAME_HEIGHT - 100)
+    listPanel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        tile = false,
+        edgeSize = 1,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    listPanel:SetBackdropColor(0.05, 0.05, 0.05, 0.8)
+    listPanel:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
-    -- Scroll Child (content container)
+    -- Scroll Frame for list
+    local scrollFrame = CreateFrame("ScrollFrame", "CraftpadScrollFrame", listPanel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", listPanel, "TOPLEFT", 5, -5)
+    scrollFrame:SetPoint("BOTTOMRIGHT", listPanel, "BOTTOMRIGHT", -25, 5)
+
+    -- Scroll Child
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollFrame:SetScrollChild(scrollChild)
-    scrollChild:SetSize(FRAME_WIDTH - 60, ROW_HEIGHT * count)
-
-    -- Populate list
     local items = Craftpad.Data.GetHousingItems()
+    scrollChild:SetSize(LIST_WIDTH - 40, ROW_HEIGHT * #items)
+
+    -- RIGHT PANEL: Detail panel
+    local detailPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    detailPanel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -70)
+    detailPanel:SetSize(DETAIL_WIDTH, FRAME_HEIGHT - 100)
+    detailPanel:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        tile = false,
+        edgeSize = 1,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    detailPanel:SetBackdropColor(0.05, 0.05, 0.05, 0.8)
+    detailPanel:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    -- Detail panel content (initially empty)
+    local detailContent = CreateFrame("ScrollFrame", nil, detailPanel)
+    detailContent:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", 5, -5)
+    detailContent:SetPoint("BOTTOMRIGHT", detailPanel, "BOTTOMRIGHT", -5, 5)
+    
+    local detailScrollChild = CreateFrame("Frame", nil, detailContent)
+    detailContent:SetScrollChild(detailScrollChild)
+    detailScrollChild:SetSize(DETAIL_WIDTH - 10, FRAME_HEIGHT - 100)
+    
+    local defaultText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    defaultText:SetPoint("CENTER", detailScrollChild, "CENTER", 0, 0)
+    defaultText:SetText("Select an item to view\ncrafting details")
+    defaultText:SetTextColor(0.6, 0.6, 0.6, 1)
+
+    -- Function to update detail panel
+    local function UpdateDetailPanel(itemData)
+        -- Completely recreate the scroll child to clear all content
+        detailScrollChild:Hide()
+        detailScrollChild:SetParent(nil)
+        detailScrollChild = CreateFrame("Frame", nil, detailContent)
+        detailContent:SetScrollChild(detailScrollChild)
+        detailScrollChild:SetSize(DETAIL_WIDTH - 10, FRAME_HEIGHT - 100)
+        
+        if not itemData then
+            local newDefaultText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            newDefaultText:SetPoint("CENTER", detailScrollChild, "CENTER", 0, 0)
+            newDefaultText:SetText("Select an item to view\ncrafting details")
+            newDefaultText:SetTextColor(0.6, 0.6, 0.6, 1)
+            return
+        end
+        
+        local yOffset = -15
+        
+        -- Item icon (large)
+        local itemIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
+        itemIcon:SetSize(48, 48)
+        itemIcon:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        if itemData.icon and itemData.icon ~= "N/A" then
+            itemIcon:SetTexture(tonumber(itemData.icon))
+        else
+            itemIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+        end
+        yOffset = yOffset - 55
+        
+        -- Item name
+        local itemName = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        itemName:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        itemName:SetText(itemData.name)
+        itemName:SetWidth(DETAIL_WIDTH - 20)
+        itemName:SetWordWrap(true)
+        yOffset = yOffset - 30
+        
+        -- Category
+        local categoryText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        categoryText:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        categoryText:SetText(itemData.category)
+        categoryText:SetTextColor(0.7, 0.7, 0.7, 1)
+        yOffset = yOffset - 20
+        
+        -- Check if craftable
+        if not itemData.profession or not itemData.reagents then
+            local noCraftText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noCraftText:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset - 20)
+            noCraftText:SetText("No crafting recipe available")
+            noCraftText:SetTextColor(0.8, 0.5, 0.5, 1)
+            return
+        end
+        
+        -- Separator
+        yOffset = yOffset - 10
+        local separator1 = detailScrollChild:CreateTexture(nil, "ARTWORK")
+        separator1:SetTexture("Interface\\Buttons\\WHITE8x8")
+        separator1:SetSize(DETAIL_WIDTH - 30, 1)
+        separator1:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        separator1:SetColorTexture(0.4, 0.4, 0.4, 1)
+        yOffset = yOffset - 15
+        
+        -- Profession section
+        local profLabel = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        profLabel:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 15, yOffset)
+        profLabel:SetText("Profession Required:")
+        profLabel:SetTextColor(1, 0.82, 0, 1)
+        yOffset = yOffset - 25
+        
+        -- Profession icon
+        local profIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
+        profIcon:SetSize(24, 24)
+        profIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 20, yOffset)
+        profIcon:SetTexture("Interface\\Icons\\" .. itemData.profession.icon)
+        
+        -- Profession name and rank
+        local profText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        profText:SetPoint("LEFT", profIcon, "RIGHT", 10, 0)
+        profText:SetText(itemData.profession.name .. " (Rank " .. itemData.profession.rank .. ")")
+        yOffset = yOffset - 35
+        
+        -- Separator
+        local separator2 = detailScrollChild:CreateTexture(nil, "ARTWORK")
+        separator2:SetTexture("Interface\\Buttons\\WHITE8x8")
+        separator2:SetSize(DETAIL_WIDTH - 30, 1)
+        separator2:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        separator2:SetColorTexture(0.4, 0.4, 0.4, 1)
+        yOffset = yOffset - 15
+        
+        -- Materials section
+        local matLabel = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        matLabel:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 15, yOffset)
+        matLabel:SetText("Materials Required:")
+        matLabel:SetTextColor(1, 0.82, 0, 1)
+        yOffset = yOffset - 25
+        
+        -- Reagents list
+        for _, reagent in ipairs(itemData.reagents) do
+            -- Reagent icon
+            local reagentIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
+            reagentIcon:SetSize(20, 20)
+            reagentIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 25, yOffset)
+            reagentIcon:SetTexture("Interface\\Icons\\" .. reagent.icon)
+            
+            -- Reagent name and quantity
+            local reagentText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            reagentText:SetPoint("LEFT", reagentIcon, "RIGHT", 8, 0)
+            reagentText:SetText(reagent.name .. " x" .. reagent.quantity)
+            reagentText:SetWidth(DETAIL_WIDTH - 80)
+            reagentText:SetJustifyH("LEFT")
+            
+            -- Apply quality color
+            local color = QUALITY_COLORS[reagent.quality] or QUALITY_COLORS[1]
+            reagentText:SetTextColor(color.r, color.g, color.b, 1)
+            
+            yOffset = yOffset - 25
+        end
+    end
+
+    -- Populate list with clickable rows
     for i, item in ipairs(items) do
-        local row = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
-        row:SetSize(FRAME_WIDTH - 60, ROW_HEIGHT)
+        local row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
+        row:SetSize(LIST_WIDTH - 40, ROW_HEIGHT)
         row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -(i-1) * ROW_HEIGHT)
         row:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -69,13 +246,61 @@ function Craftpad.UI.CreateMainFrame()
         else
             row:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
         end
+        
+        row.normalColor = {row:GetBackdropColor()}
+        row.hoverColor = {0.3, 0.3, 0.4, 0.5}
+        row.selectedColor = {0.2, 0.4, 0.6, 0.7}
 
+        -- Icon
+        local icon = row:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(ICON_SIZE, ICON_SIZE)
+        icon:SetPoint("LEFT", row, "LEFT", 5, 0)
+        
+        if item.icon and item.icon ~= "N/A" then
+            icon:SetTexture(tonumber(item.icon))
+        else
+            icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+        end
+
+        -- Name text
         local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        text:SetPoint("LEFT", row, "LEFT", 10, 0)
-        text:SetText(item.name .. " (" .. item.category .. ")")
+        text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+        text:SetText(item.name)
+        text:SetJustifyH("LEFT")
+        text:SetWidth(LIST_WIDTH - 100)
+
+        -- Hover effect
+        row:SetScript("OnEnter", function(self)
+            if self ~= selectedRow then
+                self:SetBackdropColor(unpack(self.hoverColor))
+            end
+        end)
+        
+        row:SetScript("OnLeave", function(self)
+            if self ~= selectedRow then
+                self:SetBackdropColor(unpack(self.normalColor))
+            end
+        end)
+        
+        -- Click handler
+        row:SetScript("OnClick", function(self)
+            -- Deselect previous row
+            if selectedRow then
+                selectedRow:SetBackdropColor(unpack(selectedRow.normalColor))
+            end
+            
+            -- Select this row
+            selectedRow = self
+            selectedItemData = item
+            self:SetBackdropColor(unpack(self.selectedColor))
+            
+            -- Update detail panel
+            UpdateDetailPanel(item)
+        end)
     end
 
     Craftpad.UI.MainFrame = frame
+    Craftpad.UI.UpdateDetailPanel = UpdateDetailPanel
     return frame
 end
 
