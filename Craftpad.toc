@@ -1,8 +1,12 @@
 ## Interface: 120000, 120001
 ## Version: 1.0.0
 ## Title: Craftpad
-## Notes: Simple Hello World addon for WoW Retail
+## Notes: Housing Items Database and Manager for WoW Retail
 ## Author: Florian
 ## X-License: MIT
 
-Craftpad.lua
+Core.lua
+Data\HousingItems.lua
+UI\MainFrame.lua
+UI\MinimapButton.lua
+Commands.lua
