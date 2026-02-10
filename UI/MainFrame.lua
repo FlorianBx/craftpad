@@ -8,6 +8,13 @@ local ICON_SIZE = 20
 
 local selectedRow = nil
 local selectedItemData = nil
+local currentSearchText = ""
+local itemRows = {}
+local searchBox = nil
+local listPanel = nil
+local scrollFrame = nil
+local scrollChild = nil
+local itemCount = nil
 
 -- Quality colors (WoW standard)
 local QUALITY_COLORS = {
@@ -17,6 +24,29 @@ local QUALITY_COLORS = {
     [3] = {r = 0.0, g = 0.44, b = 0.87},  -- Rare (blue)
     [4] = {r = 0.64, g = 0.21, b = 0.93}, -- Epic (purple)
 }
+
+-- Filter items based on search text
+local function FilterItems(searchText)
+    if not searchText or searchText == "" then
+        return Craftpad.Data.GetHousingItems()
+    end
+    
+    local filtered = {}
+    local lowerSearch = string.lower(searchText)
+    
+    for _, item in ipairs(Craftpad.Data.GetHousingItems()) do
+        local nameMatch = string.find(string.lower(item.name), lowerSearch, 1, true)
+        local categoryMatch = string.find(string.lower(item.category), lowerSearch, 1, true)
+        local professionMatch = item.profession and 
+            string.find(string.lower(item.profession.name), lowerSearch, 1, true)
+        
+        if nameMatch or categoryMatch or professionMatch then
+            table.insert(filtered, item)
+        end
+    end
+    
+    return filtered
+end
 
 function Craftpad.UI.CreateMainFrame()
     -- Main Frame
@@ -53,13 +83,13 @@ function Craftpad.UI.CreateMainFrame()
     end)
 
     -- Item Count
-    local itemCount = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    itemCount = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     itemCount:SetPoint("TOP", title, "BOTTOM", 0, -5)
     local count = Craftpad.Data.GetItemCount()
     itemCount:SetText(count .. " items available - Click an item to view crafting details")
 
     -- LEFT PANEL: List of items
-    local listPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+    listPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     listPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -70)
     listPanel:SetSize(LIST_WIDTH, FRAME_HEIGHT - 100)
     listPanel:SetBackdrop({
@@ -72,16 +102,73 @@ function Craftpad.UI.CreateMainFrame()
     listPanel:SetBackdropColor(0.05, 0.05, 0.05, 0.8)
     listPanel:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
+    -- Search Box
+    searchBox = CreateFrame("EditBox", nil, listPanel, "InputBoxTemplate")
+    searchBox:SetSize(LIST_WIDTH - 70, 30)
+    searchBox:SetPoint("TOPLEFT", listPanel, "TOPLEFT", 10, -10)
+    searchBox:SetAutoFocus(false)
+    searchBox:SetMaxLetters(50)
+    searchBox:SetFontObject("GameFontNormal")
+    searchBox:SetTextInsets(8, 8, 0, 0)
+    
+    -- Placeholder text
+    local placeholderText = searchBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    placeholderText:SetPoint("LEFT", searchBox, "LEFT", 8, 0)
+    placeholderText:SetText("Search items...")
+    placeholderText:SetTextColor(0.5, 0.5, 0.5, 1)
+    
+    searchBox:SetScript("OnEditFocusGained", function(self)
+        placeholderText:Hide()
+    end)
+    
+    searchBox:SetScript("OnEditFocusLost", function(self)
+        if self:GetText() == "" then
+            placeholderText:Show()
+        end
+    end)
+    
+    searchBox:SetScript("OnTextChanged", function(self)
+        local text = self:GetText()
+        if text == "" then
+            placeholderText:Show()
+        else
+            placeholderText:Hide()
+        end
+        currentSearchText = text
+        RebuildItemList()
+    end)
+    
+    -- Clear Button
+    local clearBtn = CreateFrame("Button", nil, listPanel)
+    clearBtn:SetSize(20, 20)
+    clearBtn:SetPoint("LEFT", searchBox, "RIGHT", 5, 0)
+    clearBtn:SetNormalTexture("Interface\\FriendsFrame\\ClearBroadcastIcon")
+    clearBtn:SetHighlightTexture("Interface\\FriendsFrame\\ClearBroadcastIcon")
+    clearBtn:SetScript("OnClick", function()
+        searchBox:SetText("")
+        searchBox:ClearFocus()
+        placeholderText:Show()
+        currentSearchText = ""
+        RebuildItemList()
+    end)
+    clearBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Clear search")
+        GameTooltip:Show()
+    end)
+    clearBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
     -- Scroll Frame for list
-    local scrollFrame = CreateFrame("ScrollFrame", "CraftpadScrollFrame", listPanel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", listPanel, "TOPLEFT", 5, -5)
+    scrollFrame = CreateFrame("ScrollFrame", "CraftpadScrollFrame", listPanel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", listPanel, "TOPLEFT", 5, -50)
     scrollFrame:SetPoint("BOTTOMRIGHT", listPanel, "BOTTOMRIGHT", -25, 5)
 
     -- Scroll Child
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollFrame:SetScrollChild(scrollChild)
-    local items = Craftpad.Data.GetHousingItems()
-    scrollChild:SetSize(LIST_WIDTH - 40, ROW_HEIGHT * #items)
+    scrollChild:SetSize(LIST_WIDTH - 40, FRAME_HEIGHT - 150)
 
     -- RIGHT PANEL: Detail panel
     local detailPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
@@ -230,18 +317,18 @@ function Craftpad.UI.CreateMainFrame()
             yOffset = yOffset - 25
         end
     end
-
-    -- Populate list with clickable rows
-    for i, item in ipairs(items) do
+    
+    -- Function to create a single item row
+    local function CreateItemRow(item, index)
         local row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
         row:SetSize(LIST_WIDTH - 40, ROW_HEIGHT)
-        row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -(i-1) * ROW_HEIGHT)
+        row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -(index-1) * ROW_HEIGHT)
         row:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8x8",
         })
         
         -- Alternate row colors
-        if i % 2 == 0 then
+        if index % 2 == 0 then
             row:SetBackdropColor(0.1, 0.1, 0.1, 0.3)
         else
             row:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
@@ -250,6 +337,7 @@ function Craftpad.UI.CreateMainFrame()
         row.normalColor = {row:GetBackdropColor()}
         row.hoverColor = {0.3, 0.3, 0.4, 0.5}
         row.selectedColor = {0.2, 0.4, 0.6, 0.7}
+        row.itemData = item
 
         -- Icon
         local icon = row:CreateTexture(nil, "ARTWORK")
@@ -297,7 +385,60 @@ function Craftpad.UI.CreateMainFrame()
             -- Update detail panel
             UpdateDetailPanel(item)
         end)
+        
+        -- Re-select if this was the previously selected item
+        if selectedItemData and selectedItemData.id == item.id then
+            selectedRow = row
+            row:SetBackdropColor(unpack(row.selectedColor))
+        end
+        
+        return row
     end
+    
+    -- Function to rebuild the item list based on search
+    function RebuildItemList()
+        -- Clear existing rows
+        for _, row in ipairs(itemRows) do
+            row:Hide()
+            row:SetParent(nil)
+        end
+        itemRows = {}
+        selectedRow = nil
+        
+        -- Get filtered items
+        local items = FilterItems(currentSearchText)
+        
+        -- Update item count
+        local totalCount = Craftpad.Data.GetItemCount()
+        if currentSearchText ~= "" then
+            itemCount:SetText(#items .. " of " .. totalCount .. " items - Click an item to view crafting details")
+        else
+            itemCount:SetText(totalCount .. " items available - Click an item to view crafting details")
+        end
+        
+        -- Handle no results
+        if #items == 0 then
+            scrollChild:SetSize(LIST_WIDTH - 40, 100)
+            local noResultsText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noResultsText:SetPoint("CENTER", scrollChild, "CENTER", 0, 0)
+            noResultsText:SetText("No items found")
+            noResultsText:SetTextColor(0.6, 0.6, 0.6, 1)
+            table.insert(itemRows, noResultsText)
+            return
+        end
+        
+        -- Update scroll child size
+        scrollChild:SetSize(LIST_WIDTH - 40, ROW_HEIGHT * #items)
+        
+        -- Create rows for filtered items
+        for i, item in ipairs(items) do
+            local row = CreateItemRow(item, i)
+            table.insert(itemRows, row)
+        end
+    end
+
+    -- Initial population of the list
+    RebuildItemList()
 
     Craftpad.UI.MainFrame = frame
     Craftpad.UI.UpdateDetailPanel = UpdateDetailPanel
