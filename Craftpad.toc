@@ -7,6 +7,7 @@
 
 Core.lua
 Data\HousingItems.lua
+Search\HousingItemSearch.lua
 UI\MainFrame.lua
 UI\MinimapButton.lua
 Commands.lua

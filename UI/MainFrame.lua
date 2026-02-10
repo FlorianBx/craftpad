@@ -1,4 +1,5 @@
 -- Main UI Frame with split-view: list + detail panel
+
 local FRAME_WIDTH = 800
 local FRAME_HEIGHT = 500
 local LIST_WIDTH = 350
@@ -25,27 +26,10 @@ local QUALITY_COLORS = {
     [4] = {r = 0.64, g = 0.21, b = 0.93}, -- Epic (purple)
 }
 
--- Filter items based on search text
+-- Filter items based on search text (delegates to Search module)
 local function FilterItems(searchText)
-    if not searchText or searchText == "" then
-        return Craftpad.Data.GetHousingItems()
-    end
-    
-    local filtered = {}
-    local lowerSearch = string.lower(searchText)
-    
-    for _, item in ipairs(Craftpad.Data.GetHousingItems()) do
-        local nameMatch = string.find(string.lower(item.name), lowerSearch, 1, true)
-        local categoryMatch = string.find(string.lower(item.category), lowerSearch, 1, true)
-        local professionMatch = item.profession and 
-            string.find(string.lower(item.profession.name), lowerSearch, 1, true)
-        
-        if nameMatch or categoryMatch or professionMatch then
-            table.insert(filtered, item)
-        end
-    end
-    
-    return filtered
+    local allItems = Craftpad.Data.GetHousingItems()
+    return Craftpad.Search.search_items(allItems, searchText)
 end
 
 function Craftpad.UI.CreateMainFrame()

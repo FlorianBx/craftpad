@@ -4,6 +4,7 @@ Craftpad = {}
 Craftpad.Version = "1.0.0"
 Craftpad.Data = {}
 Craftpad.UI = {}
+Craftpad.Search = {}
 
 -- Event Frame
 local eventFrame = CreateFrame("Frame")
@@ -14,6 +15,6 @@ eventFrame:SetScript("OnEvent", function(self, event, addonName)
     if event == "ADDON_LOADED" and addonName == "craftpad" then
         print("Craftpad: Addon loaded (v" .. Craftpad.Version .. ")")
     elseif event == "PLAYER_LOGIN" then
-        print("Craftpad: Type /craftpad to open housing items list")
+        print("Craftpad: Type /cp to open housing items list")
     end
 end)

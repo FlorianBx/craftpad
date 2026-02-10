@@ -11,10 +11,10 @@ help:
 
 # Run all tests
 test:
-	@echo "🧪 Running Craftpad Tests..."
+	@echo "Running Craftpad Tests..."
 	@busted --verbose
 
 # Run tests in watch mode (requires entr or similar)
 test-watch:
-	@echo "👀 Watching for changes..."
+	@echo "Watching for changes..."
 	@find . -name "*_spec.lua" -o -name "*.lua" | entr -c make test
