@@ -1,0 +1,8 @@
+## Interface: 120000, 120001
+## Version: 1.0.0
+## Title: Craftpad
+## Notes: Simple Hello World addon for WoW Retail
+## Author: Florian
+## X-License: MIT
+
+Craftpad.lua
