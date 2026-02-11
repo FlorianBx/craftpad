@@ -289,6 +289,13 @@ function Craftpad.UI.CreateMainFrame()
             
             -- Get current item count (bags + bank)
             local currentCount = GetItemCount(reagent.name, true) or 0
+            
+            -- Try to include account bank (warband bank) - TWW feature
+            if C_Item and C_Item.GetItemCount then
+                -- Use C_Item.GetItemCount with account bank parameter
+                currentCount = C_Item.GetItemCount(reagent.name, true, false, false, true) or 0
+            end
+            
             local requiredCount = reagent.quantity
             
             -- Reagent name and quantity with current/required format
