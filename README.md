@@ -1,10 +1,11 @@
 # Craftpad
-
-<img style="text-align: center;"></img>
+A World of Warcraft addon that provides a searchable database of housing items with crafting details.<br/>
 
 [![Tests](https://github.com/florianbx/Craftpad/actions/workflows/test.yml/badge.svg)](https://github.com/florianbx/Craftpad/actions/workflows/test.yml)
 
-A World of Warcraft addon that provides a searchable database of housing items with crafting details.
+<p align="center">
+  <img width="480" height="480" alt="house" src="https://github.com/user-attachments/assets/4d373d9c-2b73-4d3f-8ece-988648ffd18f" />
+</p>
 
 ## Features
 
@@ -14,6 +15,10 @@ A World of Warcraft addon that provides a searchable database of housing items w
 - Green color when ready to craft, red when you need more
 - Auto-updates when you loot items or open your bank
 - Works with bags, personal bank, and warband bank
+
+<p align="center">
+  <img width="585" height="381" alt="Screenshot 2026-02-11 at 02 41 03" src="https://github.com/user-attachments/assets/1a191e7f-db93-4e0e-a731-d7a10f43c231" />
+</p>
 
 ## How to use
 
