@@ -373,6 +373,9 @@ function Craftpad.UI.CreateMainFrame()
             selectedItemData = item
             self:SetBackdropColor(unpack(self.selectedColor))
             
+            -- Store selected item on frame so inventory events can access it
+            frame.selectedItemData = item
+            
             -- Update detail panel
             UpdateDetailPanel(item)
         end)
