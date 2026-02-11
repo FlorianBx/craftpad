@@ -12,7 +12,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 
 eventFrame:SetScript("OnEvent", function(self, event, addonName)
-    if event == "ADDON_LOADED" and addonName == "craftpad" then
+    if event == "ADDON_LOADED" and addonName == "Craftpad" then
         print("Craftpad: Addon loaded (v" .. Craftpad.Version .. ")")
     elseif event == "PLAYER_LOGIN" then
         print("Craftpad: Type /cp to open housing items list")

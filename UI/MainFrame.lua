@@ -287,16 +287,23 @@ function Craftpad.UI.CreateMainFrame()
             reagentIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 25, yOffset)
             reagentIcon:SetTexture("Interface\\Icons\\" .. reagent.icon)
             
-            -- Reagent name and quantity
+            -- Get current item count (bags + bank)
+            local currentCount = GetItemCount(reagent.name, true) or 0
+            local requiredCount = reagent.quantity
+            
+            -- Reagent name and quantity with current/required format
             local reagentText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             reagentText:SetPoint("LEFT", reagentIcon, "RIGHT", 8, 0)
-            reagentText:SetText(reagent.name .. " x" .. reagent.quantity)
+            reagentText:SetText(reagent.name .. " " .. currentCount .. "/" .. requiredCount)
             reagentText:SetWidth(DETAIL_WIDTH - 80)
             reagentText:SetJustifyH("LEFT")
             
-            -- Apply quality color
-            local color = QUALITY_COLORS[reagent.quality] or QUALITY_COLORS[1]
-            reagentText:SetTextColor(color.r, color.g, color.b, 1)
+            -- Apply color based on availability (green if enough, red if insufficient)
+            if currentCount >= requiredCount then
+                reagentText:SetTextColor(0.0, 1.0, 0.0, 1) -- Green
+            else
+                reagentText:SetTextColor(1.0, 0.3, 0.3, 1) -- Red
+            end
             
             yOffset = yOffset - 25
         end
