@@ -4,7 +4,7 @@ SLASH_CRAFTPAD2 = "/cp"
 
 SlashCmdList["CRAFTPAD"] = function(msg)
     msg = string.lower(msg or "")
-    
+
     if msg == "" then
         -- Toggle main frame
         Craftpad.UI.ToggleMainFrame()

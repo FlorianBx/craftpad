@@ -6,6 +6,11 @@ local LIST_WIDTH = 350
 local DETAIL_WIDTH = 400
 local ROW_HEIGHT = 24
 local ICON_SIZE = 20
+local REAGENT_ICON_MARGIN = 80
+
+-- Material count colors
+local COLOR_SUFFICIENT = {r = 0.0, g = 1.0, b = 0.0, a = 1}
+local COLOR_INSUFFICIENT = {r = 1.0, g = 0.3, b = 0.3, a = 1}
 
 local selectedRow = nil
 local selectedItemData = nil
@@ -17,14 +22,18 @@ local scrollFrame = nil
 local scrollChild = nil
 local itemCount = nil
 
--- Quality colors (WoW standard)
-local QUALITY_COLORS = {
-    [0] = {r = 0.62, g = 0.62, b = 0.62}, -- Poor (gray)
-    [1] = {r = 1.0, g = 1.0, b = 1.0},    -- Common (white)
-    [2] = {r = 0.12, g = 1.0, b = 0.0},   -- Uncommon (green)
-    [3] = {r = 0.0, g = 0.44, b = 0.87},  -- Rare (blue)
-    [4] = {r = 0.64, g = 0.21, b = 0.93}, -- Epic (purple)
-}
+-- Forward declaration for RebuildItemList
+local RebuildItemList
+
+-- Get total item count across bags, bank, and warband bank
+local function get_total_item_count(itemName)
+    -- Try modern API first (TWW - includes account bank)
+    if C_Item and C_Item.GetItemCount then
+        return C_Item.GetItemCount(itemName, true, false, false, true) or 0
+    end
+    -- Fallback for older versions
+    return GetItemCount(itemName, true) or 0
+end
 
 -- Filter items based on search text (delegates to Search module)
 local function FilterItems(searchText)
@@ -94,25 +103,25 @@ function Craftpad.UI.CreateMainFrame()
     searchBox:SetMaxLetters(50)
     searchBox:SetFontObject("GameFontNormal")
     searchBox:SetTextInsets(8, 8, 0, 0)
-    
+
     -- Placeholder text
     local placeholderText = searchBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     placeholderText:SetPoint("LEFT", searchBox, "LEFT", 8, 0)
     placeholderText:SetText("Search items...")
     placeholderText:SetTextColor(0.5, 0.5, 0.5, 1)
-    
-    searchBox:SetScript("OnEditFocusGained", function(self)
+
+    searchBox:SetScript("OnEditFocusGained", function()
         placeholderText:Hide()
     end)
-    
-    searchBox:SetScript("OnEditFocusLost", function(self)
-        if self:GetText() == "" then
+
+    searchBox:SetScript("OnEditFocusLost", function(box)
+        if box:GetText() == "" then
             placeholderText:Show()
         end
     end)
-    
-    searchBox:SetScript("OnTextChanged", function(self)
-        local text = self:GetText()
+
+    searchBox:SetScript("OnTextChanged", function(box)
+        local text = box:GetText()
         if text == "" then
             placeholderText:Show()
         else
@@ -121,7 +130,7 @@ function Craftpad.UI.CreateMainFrame()
         currentSearchText = text
         RebuildItemList()
     end)
-    
+
     -- Clear Button
     local clearBtn = CreateFrame("Button", nil, listPanel)
     clearBtn:SetSize(20, 20)
@@ -172,11 +181,11 @@ function Craftpad.UI.CreateMainFrame()
     local detailContent = CreateFrame("ScrollFrame", nil, detailPanel)
     detailContent:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", 5, -5)
     detailContent:SetPoint("BOTTOMRIGHT", detailPanel, "BOTTOMRIGHT", -5, 5)
-    
+
     local detailScrollChild = CreateFrame("Frame", nil, detailContent)
     detailContent:SetScrollChild(detailScrollChild)
     detailScrollChild:SetSize(DETAIL_WIDTH - 10, FRAME_HEIGHT - 100)
-    
+
     local defaultText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     defaultText:SetPoint("CENTER", detailScrollChild, "CENTER", 0, 0)
     defaultText:SetText("Select an item to view\ncrafting details")
@@ -190,7 +199,7 @@ function Craftpad.UI.CreateMainFrame()
         detailScrollChild = CreateFrame("Frame", nil, detailContent)
         detailContent:SetScrollChild(detailScrollChild)
         detailScrollChild:SetSize(DETAIL_WIDTH - 10, FRAME_HEIGHT - 100)
-        
+
         if not itemData then
             local newDefaultText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             newDefaultText:SetPoint("CENTER", detailScrollChild, "CENTER", 0, 0)
@@ -198,9 +207,9 @@ function Craftpad.UI.CreateMainFrame()
             newDefaultText:SetTextColor(0.6, 0.6, 0.6, 1)
             return
         end
-        
+
         local yOffset = -15
-        
+
         -- Item icon (large)
         local itemIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
         itemIcon:SetSize(48, 48)
@@ -211,7 +220,7 @@ function Craftpad.UI.CreateMainFrame()
             itemIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         end
         yOffset = yOffset - 55
-        
+
         -- Item name
         local itemName = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         itemName:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
@@ -219,14 +228,14 @@ function Craftpad.UI.CreateMainFrame()
         itemName:SetWidth(DETAIL_WIDTH - 20)
         itemName:SetWordWrap(true)
         yOffset = yOffset - 30
-        
+
         -- Category
         local categoryText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         categoryText:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
         categoryText:SetText(itemData.category)
         categoryText:SetTextColor(0.7, 0.7, 0.7, 1)
         yOffset = yOffset - 20
-        
+
         -- Check if craftable
         if not itemData.profession or not itemData.reagents then
             local noCraftText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -235,7 +244,7 @@ function Craftpad.UI.CreateMainFrame()
             noCraftText:SetTextColor(0.8, 0.5, 0.5, 1)
             return
         end
-        
+
         -- Separator
         yOffset = yOffset - 10
         local separator1 = detailScrollChild:CreateTexture(nil, "ARTWORK")
@@ -244,26 +253,26 @@ function Craftpad.UI.CreateMainFrame()
         separator1:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
         separator1:SetColorTexture(0.4, 0.4, 0.4, 1)
         yOffset = yOffset - 15
-        
+
         -- Profession section
         local profLabel = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         profLabel:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 15, yOffset)
         profLabel:SetText("Profession Required:")
         profLabel:SetTextColor(1, 0.82, 0, 1)
         yOffset = yOffset - 25
-        
+
         -- Profession icon
         local profIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
         profIcon:SetSize(24, 24)
         profIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 20, yOffset)
         profIcon:SetTexture("Interface\\Icons\\" .. itemData.profession.icon)
-        
+
         -- Profession name and rank
         local profText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         profText:SetPoint("LEFT", profIcon, "RIGHT", 10, 0)
         profText:SetText(itemData.profession.name .. " (Rank " .. itemData.profession.rank .. ")")
         yOffset = yOffset - 35
-        
+
         -- Separator
         local separator2 = detailScrollChild:CreateTexture(nil, "ARTWORK")
         separator2:SetTexture("Interface\\Buttons\\WHITE8x8")
@@ -271,14 +280,14 @@ function Craftpad.UI.CreateMainFrame()
         separator2:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
         separator2:SetColorTexture(0.4, 0.4, 0.4, 1)
         yOffset = yOffset - 15
-        
+
         -- Materials section
         local matLabel = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         matLabel:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 15, yOffset)
         matLabel:SetText("Materials Required:")
         matLabel:SetTextColor(1, 0.82, 0, 1)
         yOffset = yOffset - 25
-        
+
         -- Reagents list
         for _, reagent in ipairs(itemData.reagents) do
             -- Reagent icon
@@ -286,36 +295,38 @@ function Craftpad.UI.CreateMainFrame()
             reagentIcon:SetSize(20, 20)
             reagentIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 25, yOffset)
             reagentIcon:SetTexture("Interface\\Icons\\" .. reagent.icon)
-            
-            -- Get current item count (bags + bank)
-            local currentCount = GetItemCount(reagent.name, true) or 0
-            
-            -- Try to include account bank (warband bank) - TWW feature
-            if C_Item and C_Item.GetItemCount then
-                -- Use C_Item.GetItemCount with account bank parameter
-                currentCount = C_Item.GetItemCount(reagent.name, true, false, false, true) or 0
-            end
-            
+
+            local currentCount = get_total_item_count(reagent.name)
             local requiredCount = reagent.quantity
-            
+
             -- Reagent name and quantity with current/required format
             local reagentText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             reagentText:SetPoint("LEFT", reagentIcon, "RIGHT", 8, 0)
             reagentText:SetText(reagent.name .. " " .. currentCount .. "/" .. requiredCount)
-            reagentText:SetWidth(DETAIL_WIDTH - 80)
+            reagentText:SetWidth(DETAIL_WIDTH - REAGENT_ICON_MARGIN)
             reagentText:SetJustifyH("LEFT")
-            
-            -- Apply color based on availability (green if enough, red if insufficient)
+
+            -- Apply color based on availability
             if currentCount >= requiredCount then
-                reagentText:SetTextColor(0.0, 1.0, 0.0, 1) -- Green
+                reagentText:SetTextColor(
+                    COLOR_SUFFICIENT.r,
+                    COLOR_SUFFICIENT.g,
+                    COLOR_SUFFICIENT.b,
+                    COLOR_SUFFICIENT.a
+                )
             else
-                reagentText:SetTextColor(1.0, 0.3, 0.3, 1) -- Red
+                reagentText:SetTextColor(
+                    COLOR_INSUFFICIENT.r,
+                    COLOR_INSUFFICIENT.g,
+                    COLOR_INSUFFICIENT.b,
+                    COLOR_INSUFFICIENT.a
+                )
             end
-            
+
             yOffset = yOffset - 25
         end
     end
-    
+
     -- Function to create a single item row
     local function CreateItemRow(item, index)
         local row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
@@ -324,14 +335,14 @@ function Craftpad.UI.CreateMainFrame()
         row:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8x8",
         })
-        
+
         -- Alternate row colors
         if index % 2 == 0 then
             row:SetBackdropColor(0.1, 0.1, 0.1, 0.3)
         else
             row:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
         end
-        
+
         row.normalColor = {row:GetBackdropColor()}
         row.hoverColor = {0.3, 0.3, 0.4, 0.5}
         row.selectedColor = {0.2, 0.4, 0.6, 0.7}
@@ -341,7 +352,7 @@ function Craftpad.UI.CreateMainFrame()
         local icon = row:CreateTexture(nil, "ARTWORK")
         icon:SetSize(ICON_SIZE, ICON_SIZE)
         icon:SetPoint("LEFT", row, "LEFT", 5, 0)
-        
+
         if item.icon and item.icon ~= "N/A" then
             icon:SetTexture(tonumber(item.icon))
         else
@@ -361,41 +372,41 @@ function Craftpad.UI.CreateMainFrame()
                 self:SetBackdropColor(unpack(self.hoverColor))
             end
         end)
-        
+
         row:SetScript("OnLeave", function(self)
             if self ~= selectedRow then
                 self:SetBackdropColor(unpack(self.normalColor))
             end
         end)
-        
+
         -- Click handler
         row:SetScript("OnClick", function(self)
             -- Deselect previous row
             if selectedRow then
                 selectedRow:SetBackdropColor(unpack(selectedRow.normalColor))
             end
-            
+
             -- Select this row
             selectedRow = self
             selectedItemData = item
             self:SetBackdropColor(unpack(self.selectedColor))
-            
+
             -- Store selected item on frame so inventory events can access it
             frame.selectedItemData = item
-            
+
             -- Update detail panel
             UpdateDetailPanel(item)
         end)
-        
+
         -- Re-select if this was the previously selected item
         if selectedItemData and selectedItemData.id == item.id then
             selectedRow = row
             row:SetBackdropColor(unpack(row.selectedColor))
         end
-        
+
         return row
     end
-    
+
     -- Function to rebuild the item list based on search
     function RebuildItemList()
         -- Clear existing rows
@@ -405,10 +416,10 @@ function Craftpad.UI.CreateMainFrame()
         end
         itemRows = {}
         selectedRow = nil
-        
+
         -- Get filtered items
         local items = FilterItems(currentSearchText)
-        
+
         -- Update item count
         local totalCount = Craftpad.Data.GetItemCount()
         if currentSearchText ~= "" then
@@ -416,7 +427,7 @@ function Craftpad.UI.CreateMainFrame()
         else
             itemCount:SetText(totalCount .. " items available - Click an item to view crafting details")
         end
-        
+
         -- Handle no results
         if #items == 0 then
             scrollChild:SetSize(LIST_WIDTH - 40, 100)
@@ -427,10 +438,10 @@ function Craftpad.UI.CreateMainFrame()
             table.insert(itemRows, noResultsText)
             return
         end
-        
+
         -- Update scroll child size
         scrollChild:SetSize(LIST_WIDTH - 40, ROW_HEIGHT * #items)
-        
+
         -- Create rows for filtered items
         for i, item in ipairs(items) do
             local row = CreateItemRow(item, i)
@@ -450,7 +461,7 @@ function Craftpad.UI.ToggleMainFrame()
     if not Craftpad.UI.MainFrame then
         Craftpad.UI.CreateMainFrame()
     end
-    
+
     if Craftpad.UI.MainFrame:IsShown() then
         Craftpad.UI.MainFrame:Hide()
     else
