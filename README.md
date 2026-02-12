@@ -15,6 +15,7 @@ A World of Warcraft addon that provides a searchable database of housing items w
 - Green color when ready to craft, red when you need more
 - Auto-updates when you loot items or open your bank
 - Works with bags, personal bank, and warband bank
+- **Community Crafters**: See who in your communities can craft items (requires addon installed)
 
 <p align="center">
   <img width="585" height="381" alt="Screenshot 2026-02-11 at 02 41 03" src="https://github.com/user-attachments/assets/1a191e7f-db93-4e0e-a731-d7a10f43c231" />
@@ -28,8 +29,19 @@ Search for an item and click on it. The right side shows:
 - The full recipe
 - Your current materials (from bags and banks)
 - What you still need
+- **Community crafters** who can make the item (with their profession level)
 
 Material counts update automatically while you play.
+
+### Community Crafters Feature
+
+The addon automatically shares your professions with other players in your communities who also have Craftpad installed. This happens:
+- When you log in (5 seconds delay)
+- When you learn or level up a profession
+
+When you select an item, you'll see a list of players from your communities who can craft it, along with their skill level. No manual scanning needed - it's all automatic!
+
+**Privacy**: Your profession data is only shared within WoW communities you're already a member of, and only with players who have Craftpad installed.
 
 ## Installation
 

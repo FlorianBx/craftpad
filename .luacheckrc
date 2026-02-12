@@ -11,11 +11,22 @@ read_globals = {
     "UnitAffectingCombat",
     "Enum",
     "unpack",
+    -- Profession API
+    "GetProfessions", "GetProfessionInfo",
+    -- Community/Chat API
+    "C_Club", "C_ChatInfo",
+    -- Timer API
+    "C_Timer",
+    -- Player API
+    "UnitName", "GetRealmName",
+    -- Time
+    "time",
 }
 
 -- Craftpad addon globals (writable)
 globals = {
     "Craftpad",
+    "CraftpadDB",  -- SavedVariables
     "SLASH_CRAFTPAD1", "SLASH_CRAFTPAD2", "SLASH_CP1",
     "SlashCmdList",
 }

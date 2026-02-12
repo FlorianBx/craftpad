@@ -1,5 +1,6 @@
 ## Interface: 120000, 120001
 ## Version: 1.0.0
+## SavedVariables: CraftpadDB
 ## Title: Craftpad
 ## Notes: Housing Items Database and Manager for WoW Retail
 ## Author: Florian
@@ -8,6 +9,7 @@
 Core.lua
 Data\HousingItems.lua
 Search\HousingItemSearch.lua
+Community\CommunitySync.lua
 UI\MainFrame.lua
 UI\MinimapButton.lua
 Commands.lua

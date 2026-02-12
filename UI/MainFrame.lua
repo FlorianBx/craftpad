@@ -1,5 +1,4 @@
 -- Main UI Frame with split-view: list + detail panel
-
 local FRAME_WIDTH = 800
 local FRAME_HEIGHT = 500
 local LIST_WIDTH = 350
@@ -7,11 +6,9 @@ local DETAIL_WIDTH = 400
 local ROW_HEIGHT = 24
 local ICON_SIZE = 20
 local REAGENT_ICON_MARGIN = 80
-
 -- Material count colors
 local COLOR_SUFFICIENT = {r = 0.0, g = 1.0, b = 0.0, a = 1}
 local COLOR_INSUFFICIENT = {r = 1.0, g = 0.3, b = 0.3, a = 1}
-
 local selectedRow = nil
 local selectedItemData = nil
 local currentSearchText = ""
@@ -21,10 +18,10 @@ local listPanel = nil
 local scrollFrame = nil
 local scrollChild = nil
 local itemCount = nil
-
+local currentTab = 1  -- luacheck: ignore 231 (will be used for state tracking)
+local showCraftersTab = true -- Option to show/hide Crafters tab
 -- Forward declaration for RebuildItemList
 local RebuildItemList
-
 -- Get total item count across bags, bank, and warband bank
 local function get_total_item_count(itemName)
     -- Try modern API first (TWW - includes account bank)
@@ -34,13 +31,11 @@ local function get_total_item_count(itemName)
     -- Fallback for older versions
     return GetItemCount(itemName, true) or 0
 end
-
 -- Filter items based on search text (delegates to Search module)
 local function FilterItems(searchText)
     local allItems = Craftpad.Data.GetHousingItems()
     return Craftpad.Search.search_items(allItems, searchText)
 end
-
 function Craftpad.UI.CreateMainFrame()
     -- Main Frame
     local frame = CreateFrame("Frame", "CraftpadMainFrame", UIParent, "BackdropTemplate")
@@ -62,25 +57,21 @@ function Craftpad.UI.CreateMainFrame()
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetClampedToScreen(true)
     frame:Hide()
-
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", frame, "TOP", 0, -20)
     title:SetText("Craftpad - Housing Items")
-
     -- Close Button
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
     closeBtn:SetScript("OnClick", function()
         frame:Hide()
     end)
-
     -- Item Count
     itemCount = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     itemCount:SetPoint("TOP", title, "BOTTOM", 0, -5)
     local count = Craftpad.Data.GetItemCount()
     itemCount:SetText(count .. " items available - Click an item to view crafting details")
-
     -- LEFT PANEL: List of items
     listPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     listPanel:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -70)
@@ -94,7 +85,6 @@ function Craftpad.UI.CreateMainFrame()
     })
     listPanel:SetBackdropColor(0.05, 0.05, 0.05, 0.8)
     listPanel:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-
     -- Search Box
     searchBox = CreateFrame("EditBox", nil, listPanel, "InputBoxTemplate")
     searchBox:SetSize(LIST_WIDTH - 70, 30)
@@ -103,23 +93,19 @@ function Craftpad.UI.CreateMainFrame()
     searchBox:SetMaxLetters(50)
     searchBox:SetFontObject("GameFontNormal")
     searchBox:SetTextInsets(8, 8, 0, 0)
-
     -- Placeholder text
     local placeholderText = searchBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     placeholderText:SetPoint("LEFT", searchBox, "LEFT", 8, 0)
     placeholderText:SetText("Search items...")
     placeholderText:SetTextColor(0.5, 0.5, 0.5, 1)
-
     searchBox:SetScript("OnEditFocusGained", function()
         placeholderText:Hide()
     end)
-
     searchBox:SetScript("OnEditFocusLost", function(box)
         if box:GetText() == "" then
             placeholderText:Show()
         end
     end)
-
     searchBox:SetScript("OnTextChanged", function(box)
         local text = box:GetText()
         if text == "" then
@@ -130,7 +116,6 @@ function Craftpad.UI.CreateMainFrame()
         currentSearchText = text
         RebuildItemList()
     end)
-
     -- Clear Button
     local clearBtn = CreateFrame("Button", nil, listPanel)
     clearBtn:SetSize(20, 20)
@@ -152,18 +137,15 @@ function Craftpad.UI.CreateMainFrame()
     clearBtn:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
-
     -- Scroll Frame for list
     scrollFrame = CreateFrame("ScrollFrame", "CraftpadScrollFrame", listPanel, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", listPanel, "TOPLEFT", 5, -50)
     scrollFrame:SetPoint("BOTTOMRIGHT", listPanel, "BOTTOMRIGHT", -25, 5)
-
     -- Scroll Child
     scrollChild = CreateFrame("Frame", nil, scrollFrame)
     scrollFrame:SetScrollChild(scrollChild)
     scrollChild:SetSize(LIST_WIDTH - 40, FRAME_HEIGHT - 150)
-
-    -- RIGHT PANEL: Detail panel
+    -- RIGHT PANEL: Detail panel with tabs
     local detailPanel = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     detailPanel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -70)
     detailPanel:SetSize(DETAIL_WIDTH, FRAME_HEIGHT - 100)
@@ -176,157 +158,254 @@ function Craftpad.UI.CreateMainFrame()
     })
     detailPanel:SetBackdropColor(0.05, 0.05, 0.05, 0.8)
     detailPanel:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-
-    -- Detail panel content (initially empty)
-    local detailContent = CreateFrame("ScrollFrame", nil, detailPanel)
-    detailContent:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", 5, -5)
-    detailContent:SetPoint("BOTTOMRIGHT", detailPanel, "BOTTOMRIGHT", -5, 5)
-
-    local detailScrollChild = CreateFrame("Frame", nil, detailContent)
-    detailContent:SetScrollChild(detailScrollChild)
-    detailScrollChild:SetSize(DETAIL_WIDTH - 10, FRAME_HEIGHT - 100)
-
-    local defaultText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    defaultText:SetPoint("CENTER", detailScrollChild, "CENTER", 0, 0)
-    defaultText:SetText("Select an item to view\ncrafting details")
-    defaultText:SetTextColor(0.6, 0.6, 0.6, 1)
-
-    -- Function to update detail panel
-    local function UpdateDetailPanel(itemData)
-        -- Completely recreate the scroll child to clear all content
-        detailScrollChild:Hide()
-        detailScrollChild:SetParent(nil)
-        detailScrollChild = CreateFrame("Frame", nil, detailContent)
-        detailContent:SetScrollChild(detailScrollChild)
-        detailScrollChild:SetSize(DETAIL_WIDTH - 10, FRAME_HEIGHT - 100)
-
-        if not itemData then
-            local newDefaultText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            newDefaultText:SetPoint("CENTER", detailScrollChild, "CENTER", 0, 0)
-            newDefaultText:SetText("Select an item to view\ncrafting details")
-            newDefaultText:SetTextColor(0.6, 0.6, 0.6, 1)
-            return
+    -- Tab buttons
+    local tabs = {}
+    local tabContents = {}
+    local TAB_HEIGHT = 30
+    local TAB_NAMES = {"Info", "Recipe", "Crafters"}
+    local function switch_tab(tabIndex)
+        currentTab = tabIndex
+        for i, tab in ipairs(tabs) do
+            if i == tabIndex then
+                tab:SetBackdropColor(0.2, 0.4, 0.6, 0.9)
+                tabContents[i]:Show()
+            else
+                tab:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+                tabContents[i]:Hide()
+            end
         end
-
+    end
+    -- Create tab buttons
+    for i, tabName in ipairs(TAB_NAMES) do
+        if i <= 2 or (i == 3 and showCraftersTab) then
+            local tab = CreateFrame("Button", nil, detailPanel, "BackdropTemplate")
+            tab:SetSize(DETAIL_WIDTH / 3 - 5, TAB_HEIGHT)
+            tab:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", (i-1) * (DETAIL_WIDTH / 3), 0)
+            tab:SetBackdrop({
+                bgFile = "Interface\\Buttons\\WHITE8x8",
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                tile = false,
+                edgeSize = 1,
+                insets = { left = 0, right = 0, top = 0, bottom = 0 }
+            })
+            tab:SetBackdropColor(0.1, 0.1, 0.1, 0.7)
+            tab:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+            local tabText = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            tabText:SetPoint("CENTER", tab, "CENTER", 0, 0)
+            tabText:SetText(tabName)
+            tab:SetScript("OnClick", function()
+                switch_tab(i)
+            end)
+            tabs[i] = tab
+        end
+    end
+    -- Create tab content containers
+    for i = 1, 3 do
+        local content = CreateFrame("ScrollFrame", nil, detailPanel)
+        content:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", 5, -(TAB_HEIGHT + 5))
+        content:SetPoint("BOTTOMRIGHT", detailPanel, "BOTTOMRIGHT", -5, 5)
+        local tabScrollChild = CreateFrame("Frame", nil, content)
+        content:SetScrollChild(tabScrollChild)
+        tabScrollChild:SetSize(DETAIL_WIDTH - 20, FRAME_HEIGHT - 140)
+        content.scrollChild = tabScrollChild
+        tabContents[i] = content
+        content:Hide()
+    end
+    -- Show first tab by default
+    switch_tab(1)
+    -- Default text for tab 1
+    local defaultText = tabContents[1].scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    defaultText:SetPoint("CENTER", tabContents[1].scrollChild, "CENTER", 0, 0)
+    defaultText:SetText("Select an item to view details")
+    defaultText:SetTextColor(0.6, 0.6, 0.6, 1)
+    -- Function to render Tab 1: Item Info
+    local function render_info_tab(itemData)
+        local tabScroll = tabContents[1].scrollChild
+        tabScroll:Hide()
+        tabScroll:SetParent(nil)
+        tabScroll = CreateFrame("Frame", nil, tabContents[1])
+        tabContents[1]:SetScrollChild(tabScroll)
+        tabScroll:SetSize(DETAIL_WIDTH - 20, FRAME_HEIGHT - 140)
+        tabContents[1].scrollChild = tabScroll
         local yOffset = -15
-
         -- Item icon (large)
-        local itemIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
-        itemIcon:SetSize(48, 48)
-        itemIcon:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        local itemIcon = tabScroll:CreateTexture(nil, "ARTWORK")
+        itemIcon:SetSize(64, 64)
+        itemIcon:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
         if itemData.icon and itemData.icon ~= "N/A" then
             itemIcon:SetTexture(tonumber(itemData.icon))
         else
             itemIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         end
-        yOffset = yOffset - 55
-
+        yOffset = yOffset - 75
         -- Item name
-        local itemName = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        itemName:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
+        local itemName = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        itemName:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
         itemName:SetText(itemData.name)
-        itemName:SetWidth(DETAIL_WIDTH - 20)
+        itemName:SetWidth(DETAIL_WIDTH - 30)
         itemName:SetWordWrap(true)
-        yOffset = yOffset - 30
-
+        yOffset = yOffset - 35
         -- Category
-        local categoryText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        categoryText:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
-        categoryText:SetText(itemData.category)
-        categoryText:SetTextColor(0.7, 0.7, 0.7, 1)
-        yOffset = yOffset - 20
-
-        -- Check if craftable
+        local categoryText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        categoryText:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
+        categoryText:SetText("Category: " .. itemData.category)
+        categoryText:SetTextColor(0.8, 0.8, 0.8, 1)
+        yOffset = yOffset - 25
+        -- Item ID
+        local idText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        idText:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
+        idText:SetText("Item ID: " .. itemData.id)
+        idText:SetTextColor(0.6, 0.6, 0.6, 1)
+    end
+    -- Function to render Tab 2: Recipe (Profession + Materials)
+    local function render_recipe_tab(itemData)
+        local tabScroll = tabContents[2].scrollChild
+        tabScroll:Hide()
+        tabScroll:SetParent(nil)
+        tabScroll = CreateFrame("Frame", nil, tabContents[2])
+        tabContents[2]:SetScrollChild(tabScroll)
+        tabScroll:SetSize(DETAIL_WIDTH - 20, FRAME_HEIGHT - 140)
+        tabContents[2].scrollChild = tabScroll
         if not itemData.profession or not itemData.reagents then
-            local noCraftText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            noCraftText:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset - 20)
+            local noCraftText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noCraftText:SetPoint("CENTER", tabScroll, "CENTER", 0, 0)
             noCraftText:SetText("No crafting recipe available")
             noCraftText:SetTextColor(0.8, 0.5, 0.5, 1)
             return
         end
-
-        -- Separator
-        yOffset = yOffset - 10
-        local separator1 = detailScrollChild:CreateTexture(nil, "ARTWORK")
-        separator1:SetTexture("Interface\\Buttons\\WHITE8x8")
-        separator1:SetSize(DETAIL_WIDTH - 30, 1)
-        separator1:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
-        separator1:SetColorTexture(0.4, 0.4, 0.4, 1)
-        yOffset = yOffset - 15
-
+        local yOffset = -15
         -- Profession section
-        local profLabel = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        profLabel:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 15, yOffset)
+        local profLabel = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        profLabel:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 10, yOffset)
         profLabel:SetText("Profession Required:")
         profLabel:SetTextColor(1, 0.82, 0, 1)
         yOffset = yOffset - 25
-
         -- Profession icon
-        local profIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
+        local profIcon = tabScroll:CreateTexture(nil, "ARTWORK")
         profIcon:SetSize(24, 24)
-        profIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 20, yOffset)
+        profIcon:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 15, yOffset)
         profIcon:SetTexture("Interface\\Icons\\" .. itemData.profession.icon)
-
         -- Profession name and rank
-        local profText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local profText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         profText:SetPoint("LEFT", profIcon, "RIGHT", 10, 0)
         profText:SetText(itemData.profession.name .. " (Rank " .. itemData.profession.rank .. ")")
         yOffset = yOffset - 35
-
         -- Separator
-        local separator2 = detailScrollChild:CreateTexture(nil, "ARTWORK")
-        separator2:SetTexture("Interface\\Buttons\\WHITE8x8")
-        separator2:SetSize(DETAIL_WIDTH - 30, 1)
-        separator2:SetPoint("TOP", detailScrollChild, "TOP", 0, yOffset)
-        separator2:SetColorTexture(0.4, 0.4, 0.4, 1)
+        local separator = tabScroll:CreateTexture(nil, "ARTWORK")
+        separator:SetTexture("Interface\\Buttons\\WHITE8x8")
+        separator:SetSize(DETAIL_WIDTH - 40, 1)
+        separator:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
+        separator:SetColorTexture(0.4, 0.4, 0.4, 1)
         yOffset = yOffset - 15
-
         -- Materials section
-        local matLabel = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        matLabel:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 15, yOffset)
+        local matLabel = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        matLabel:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 10, yOffset)
         matLabel:SetText("Materials Required:")
         matLabel:SetTextColor(1, 0.82, 0, 1)
         yOffset = yOffset - 25
-
         -- Reagents list
         for _, reagent in ipairs(itemData.reagents) do
-            -- Reagent icon
-            local reagentIcon = detailScrollChild:CreateTexture(nil, "ARTWORK")
+            local reagentIcon = tabScroll:CreateTexture(nil, "ARTWORK")
             reagentIcon:SetSize(20, 20)
-            reagentIcon:SetPoint("TOPLEFT", detailScrollChild, "TOPLEFT", 25, yOffset)
+            reagentIcon:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 20, yOffset)
             reagentIcon:SetTexture("Interface\\Icons\\" .. reagent.icon)
-
             local currentCount = get_total_item_count(reagent.name)
             local requiredCount = reagent.quantity
-
-            -- Reagent name and quantity with current/required format
-            local reagentText = detailScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            local reagentText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             reagentText:SetPoint("LEFT", reagentIcon, "RIGHT", 8, 0)
             reagentText:SetText(reagent.name .. " " .. currentCount .. "/" .. requiredCount)
             reagentText:SetWidth(DETAIL_WIDTH - REAGENT_ICON_MARGIN)
             reagentText:SetJustifyH("LEFT")
-
-            -- Apply color based on availability
             if currentCount >= requiredCount then
                 reagentText:SetTextColor(
-                    COLOR_SUFFICIENT.r,
-                    COLOR_SUFFICIENT.g,
-                    COLOR_SUFFICIENT.b,
-                    COLOR_SUFFICIENT.a
+                    COLOR_SUFFICIENT.r, COLOR_SUFFICIENT.g,
+                    COLOR_SUFFICIENT.b, COLOR_SUFFICIENT.a
                 )
             else
                 reagentText:SetTextColor(
-                    COLOR_INSUFFICIENT.r,
-                    COLOR_INSUFFICIENT.g,
-                    COLOR_INSUFFICIENT.b,
-                    COLOR_INSUFFICIENT.a
+                    COLOR_INSUFFICIENT.r, COLOR_INSUFFICIENT.g,
+                    COLOR_INSUFFICIENT.b, COLOR_INSUFFICIENT.a
                 )
             end
-
             yOffset = yOffset - 25
         end
     end
-
+    -- Function to render Tab 3: Community Crafters
+    local function render_crafters_tab(itemData)
+        local tabScroll = tabContents[3].scrollChild
+        tabScroll:Hide()
+        tabScroll:SetParent(nil)
+        tabScroll = CreateFrame("Frame", nil, tabContents[3])
+        tabContents[3]:SetScrollChild(tabScroll)
+        tabScroll:SetSize(DETAIL_WIDTH - 20, FRAME_HEIGHT - 140)
+        tabContents[3].scrollChild = tabScroll
+        local yOffset = -15
+        -- Find crafters
+        local crafters = Craftpad.Community.FindCraftersForItem(itemData)
+        if #crafters == 0 then
+            local noCraftersText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            noCraftersText:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
+            noCraftersText:SetText("No crafters found in your communities")
+            noCraftersText:SetTextColor(0.7, 0.7, 0.7, 1)
+            yOffset = yOffset - 30
+            local helpText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            helpText:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
+            helpText:SetText("Other players need Craftpad installed\nto share their professions")
+            helpText:SetTextColor(0.6, 0.6, 0.6, 1)
+            helpText:SetWidth(DETAIL_WIDTH - 30)
+            helpText:SetWordWrap(true)
+        else
+            -- Header
+            local headerText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            headerText:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 10, yOffset)
+            headerText:SetText(#crafters .. " crafter(s) found:")
+            headerText:SetTextColor(1, 0.82, 0, 1)
+            yOffset = yOffset - 30
+            -- Display each crafter
+            for _, crafter in ipairs(crafters) do
+                local crafterIcon = tabScroll:CreateTexture(nil, "ARTWORK")
+                crafterIcon:SetSize(20, 20)
+                crafterIcon:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 15, yOffset)
+                crafterIcon:SetTexture("Interface\\Icons\\" .. crafter.icon)
+                local crafterText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                crafterText:SetPoint("LEFT", crafterIcon, "RIGHT", 8, 0)
+                crafterText:SetText(crafter.playerName)
+                crafterText:SetTextColor(0.3, 1.0, 0.3, 1)
+                local skillText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                skillText:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 45, yOffset - 15)
+                local skillText_str = crafter.profession .. " (" ..
+                    crafter.skillLevel .. "/" .. crafter.maxSkillLevel .. ")"
+                skillText:SetText(skillText_str)
+                skillText:SetTextColor(0.8, 0.8, 0.8, 1)
+                yOffset = yOffset - 40
+            end
+        end
+    end
+    -- Main function to update detail panel
+    local function UpdateDetailPanel(itemData)
+        if not itemData then
+            -- Clear all tabs and show default
+            for i = 1, 3 do
+                local clearScroll = tabContents[i].scrollChild
+                clearScroll:Hide()
+                clearScroll:SetParent(nil)
+                clearScroll = CreateFrame("Frame", nil, tabContents[i])
+                tabContents[i]:SetScrollChild(clearScroll)
+                clearScroll:SetSize(DETAIL_WIDTH - 20, FRAME_HEIGHT - 140)
+                tabContents[i].scrollChild = clearScroll
+            end
+            local emptyText = tabContents[1].scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            emptyText:SetPoint("CENTER", tabContents[1].scrollChild, "CENTER", 0, 0)
+            emptyText:SetText("Select an item to view details")
+            emptyText:SetTextColor(0.6, 0.6, 0.6, 1)
+            switch_tab(1)
+            return
+        end
+        -- Render all tabs with data
+        render_info_tab(itemData)
+        render_recipe_tab(itemData)
+        render_crafters_tab(itemData)
+    end
     -- Function to create a single item row
     local function CreateItemRow(item, index)
         local row = CreateFrame("Button", nil, scrollChild, "BackdropTemplate")
@@ -335,78 +414,64 @@ function Craftpad.UI.CreateMainFrame()
         row:SetBackdrop({
             bgFile = "Interface\\Buttons\\WHITE8x8",
         })
-
         -- Alternate row colors
         if index % 2 == 0 then
             row:SetBackdropColor(0.1, 0.1, 0.1, 0.3)
         else
             row:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
         end
-
         row.normalColor = {row:GetBackdropColor()}
         row.hoverColor = {0.3, 0.3, 0.4, 0.5}
         row.selectedColor = {0.2, 0.4, 0.6, 0.7}
         row.itemData = item
-
         -- Icon
         local icon = row:CreateTexture(nil, "ARTWORK")
         icon:SetSize(ICON_SIZE, ICON_SIZE)
         icon:SetPoint("LEFT", row, "LEFT", 5, 0)
-
         if item.icon and item.icon ~= "N/A" then
             icon:SetTexture(tonumber(item.icon))
         else
             icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         end
-
         -- Name text
         local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
         text:SetText(item.name)
         text:SetJustifyH("LEFT")
         text:SetWidth(LIST_WIDTH - 100)
-
         -- Hover effect
         row:SetScript("OnEnter", function(self)
             if self ~= selectedRow then
                 self:SetBackdropColor(unpack(self.hoverColor))
             end
         end)
-
         row:SetScript("OnLeave", function(self)
             if self ~= selectedRow then
                 self:SetBackdropColor(unpack(self.normalColor))
             end
         end)
-
         -- Click handler
         row:SetScript("OnClick", function(self)
             -- Deselect previous row
             if selectedRow then
                 selectedRow:SetBackdropColor(unpack(selectedRow.normalColor))
             end
-
             -- Select this row
             selectedRow = self
             selectedItemData = item
             self:SetBackdropColor(unpack(self.selectedColor))
-
             -- Store selected item on frame so inventory events can access it
             frame.selectedItemData = item
-
             -- Update detail panel
             UpdateDetailPanel(item)
         end)
-
         -- Re-select if this was the previously selected item
         if selectedItemData and selectedItemData.id == item.id then
             selectedRow = row
             row:SetBackdropColor(unpack(row.selectedColor))
         end
-
         return row
     end
-
     -- Function to rebuild the item list based on search
     function RebuildItemList()
         -- Clear existing rows
@@ -416,10 +481,8 @@ function Craftpad.UI.CreateMainFrame()
         end
         itemRows = {}
         selectedRow = nil
-
         -- Get filtered items
         local items = FilterItems(currentSearchText)
-
         -- Update item count
         local totalCount = Craftpad.Data.GetItemCount()
         if currentSearchText ~= "" then
@@ -427,7 +490,6 @@ function Craftpad.UI.CreateMainFrame()
         else
             itemCount:SetText(totalCount .. " items available - Click an item to view crafting details")
         end
-
         -- Handle no results
         if #items == 0 then
             scrollChild:SetSize(LIST_WIDTH - 40, 100)
@@ -438,30 +500,24 @@ function Craftpad.UI.CreateMainFrame()
             table.insert(itemRows, noResultsText)
             return
         end
-
         -- Update scroll child size
         scrollChild:SetSize(LIST_WIDTH - 40, ROW_HEIGHT * #items)
-
         -- Create rows for filtered items
         for i, item in ipairs(items) do
             local row = CreateItemRow(item, i)
             table.insert(itemRows, row)
         end
     end
-
     -- Initial population of the list
     RebuildItemList()
-
     Craftpad.UI.MainFrame = frame
     Craftpad.UI.UpdateDetailPanel = UpdateDetailPanel
     return frame
 end
-
 function Craftpad.UI.ToggleMainFrame()
     if not Craftpad.UI.MainFrame then
         Craftpad.UI.CreateMainFrame()
     end
-
     if Craftpad.UI.MainFrame:IsShown() then
         Craftpad.UI.MainFrame:Hide()
     else
