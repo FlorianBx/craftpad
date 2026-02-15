@@ -23,7 +23,7 @@ local showCraftersTab = true -- Option to show/hide Crafters tab
 -- Forward declaration for RebuildItemList
 local RebuildItemList
 -- Get localized item name using WoW API
-local function get_localized_item_name(itemData)
+local function getLocalizedItemName(itemData)
     if itemData.id and Craftpad.Utils and Craftpad.Utils.GetItemName then
         return Craftpad.Utils.GetItemName(itemData.id, itemData.name)
     end
@@ -249,7 +249,7 @@ function Craftpad.UI.CreateMainFrame()
         -- Item name
         local itemName = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         itemName:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
-        itemName:SetText(get_localized_item_name(itemData))
+        itemName:SetText(getLocalizedItemName(itemData))
         itemName:SetWidth(DETAIL_WIDTH - 30)
         itemName:SetWordWrap(true)
         yOffset = yOffset - 35
@@ -459,7 +459,7 @@ function Craftpad.UI.CreateMainFrame()
         -- Name text
         local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-        text:SetText(get_localized_item_name(item))
+        text:SetText(getLocalizedItemName(item))
         text:SetJustifyH("LEFT")
         text:SetWidth(LIST_WIDTH - 100)
         -- Hover effect

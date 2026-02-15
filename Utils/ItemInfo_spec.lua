@@ -118,7 +118,7 @@ describe("ItemInfo Utility", function()
     describe("PreloadItemInfo", function()
         it("calls GetItemInfo to trigger async loading", function()
             local called = false
-            _G.GetItemInfo = function(itemID)
+            _G.GetItemInfo = function()  -- luacheck: ignore 212
                 called = true
                 return nil
             end

@@ -99,7 +99,9 @@ local professionTranslations = {
     },
 }
 
--- Get translated category name
+-- Get translated category name based on client locale
+-- @param englishName string The English category name (e.g. "Miscellaneous")
+-- @return string The localized category name, or English name if no translation available
 function Craftpad.L10n.GetCategory(englishName)
     if not englishName then
         return ""
@@ -113,7 +115,9 @@ function Craftpad.L10n.GetCategory(englishName)
     return englishName
 end
 
--- Get translated profession name
+-- Get translated profession name based on client locale
+-- @param englishName string The English profession name (e.g. "Cataclysm Inscription")
+-- @return string The localized profession name, or English name if no translation available
 function Craftpad.L10n.GetProfession(englishName)
     if not englishName then
         return ""

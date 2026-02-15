@@ -9,8 +9,9 @@ if not Craftpad.Utils then Craftpad.Utils = {} end
 local itemNameCache = {}
 
 -- Get localized item name from item ID
--- Returns the item name in the client's current locale
--- Falls back to the provided fallback name if the item is not in cache
+-- @param itemID number The WoW item ID
+-- @param fallbackName string Optional fallback name if item not found
+-- @return string The localized item name in client's locale, or fallback/empty string
 function Craftpad.Utils.GetItemName(itemID, fallbackName)
     if not itemID then
         return fallbackName or ""
@@ -38,8 +39,12 @@ function Craftpad.Utils.GetItemName(itemID, fallbackName)
     return fallbackName or ""
 end
 
--- Get localized item name using Item API (modern approach for TWW)
--- This is an alternative that uses C_Item.GetItemInfo
+-- Get localized item name using modern Item API (TWW)
+-- This function is for compatibility with newer WoW versions that prefer C_Item API
+-- Use GetItemName() for most cases - it automatically tries modern API first
+-- @param itemID number The WoW item ID
+-- @param fallbackName string Optional fallback name if item not found
+-- @return string The localized item name in client's locale, or fallback/empty string
 function Craftpad.Utils.GetItemNameModern(itemID, fallbackName)
     if not itemID then
         return fallbackName or ""
