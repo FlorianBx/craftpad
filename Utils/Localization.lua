@@ -104,11 +104,11 @@ function Craftpad.L10n.GetCategory(englishName)
     if not englishName then
         return ""
     end
-    
+
     if categoryTranslations[locale] and categoryTranslations[locale][englishName] then
         return categoryTranslations[locale][englishName]
     end
-    
+
     -- Fallback to English
     return englishName
 end
@@ -118,11 +118,11 @@ function Craftpad.L10n.GetProfession(englishName)
     if not englishName then
         return ""
     end
-    
+
     if professionTranslations[locale] and professionTranslations[locale][englishName] then
         return professionTranslations[locale][englishName]
     end
-    
+
     -- Fallback to English
     return englishName
 end

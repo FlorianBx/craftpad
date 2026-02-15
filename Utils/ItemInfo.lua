@@ -22,9 +22,11 @@ function Craftpad.Utils.GetItemName(itemID, fallbackName)
     end
 
     -- Try to get item info from WoW API
-    -- GetItemInfo returns: name, link, quality, iLevel, reqLevel, class, subclass, maxStack, equipSlot, texture, vendorPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent
+    -- GetItemInfo returns: name, link, quality, iLevel, reqLevel, class, subclass,
+    -- maxStack, equipSlot, texture, vendorPrice, classID, subclassID, bindType,
+    -- expacID, setID, isCraftingReagent
     local itemName = GetItemInfo(itemID)
-    
+
     if itemName then
         -- Cache the result
         itemNameCache[itemID] = itemName
@@ -74,7 +76,7 @@ function Craftpad.Utils.PreloadItemInfo(itemID)
     if not itemID or itemNameCache[itemID] then
         return
     end
-    
+
     -- Calling GetItemInfo with an ID triggers async loading
     GetItemInfo(itemID)
 end

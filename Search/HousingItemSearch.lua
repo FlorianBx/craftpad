@@ -23,7 +23,7 @@ local function is_item_matching_query(item, query)
     if item.id and Craftpad.Utils and Craftpad.Utils.GetItemName then
         localizedName = Craftpad.Utils.GetItemName(item.id, item.name)
     end
-    
+
     if _text_contains(localizedName, query) then
         return true
     end

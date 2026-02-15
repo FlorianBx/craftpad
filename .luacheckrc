@@ -7,7 +7,7 @@ max_line_length = 120
 read_globals = {
     "CreateFrame", "UIParent", "GameTooltip", "GameTooltip_SetDefaultAnchor",
     "Minimap", "GetCursorPosition",
-    "GetItemCount", "C_Item",
+    "GetItemCount", "GetItemInfo", "C_Item",
     "UnitAffectingCombat",
     "Enum",
     "unpack",
@@ -19,6 +19,8 @@ read_globals = {
     "C_Timer",
     -- Player API
     "UnitName", "GetRealmName",
+    -- Localization
+    "GetLocale",
     -- Time
     "time",
 }
