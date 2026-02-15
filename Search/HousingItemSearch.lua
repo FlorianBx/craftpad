@@ -18,16 +18,34 @@ end
 
 -- Check if item matches search query
 local function is_item_matching_query(item, query)
-    if _text_contains(item.name, query) then
+    -- Try to get localized item name from WoW API
+    local localizedName = item.name
+    if item.id and Craftpad.Utils and Craftpad.Utils.GetItemName then
+        localizedName = Craftpad.Utils.GetItemName(item.id, item.name)
+    end
+    
+    if _text_contains(localizedName, query) then
         return true
     end
 
-    if _text_contains(item.category, query) then
+    -- Search in localized category
+    local localizedCategory = item.category
+    if Craftpad.L10n and Craftpad.L10n.GetCategory then
+        localizedCategory = Craftpad.L10n.GetCategory(item.category)
+    end
+    if _text_contains(localizedCategory, query) then
         return true
     end
 
-    if item.profession and _text_contains(item.profession.name, query) then
-        return true
+    -- Search in localized profession name
+    if item.profession then
+        local localizedProfession = item.profession.name
+        if Craftpad.L10n and Craftpad.L10n.GetProfession then
+            localizedProfession = Craftpad.L10n.GetProfession(item.profession.name)
+        end
+        if _text_contains(localizedProfession, query) then
+            return true
+        end
     end
 
     return false

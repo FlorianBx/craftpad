@@ -22,14 +22,22 @@ local currentTab = 1  -- luacheck: ignore 231 (will be used for state tracking)
 local showCraftersTab = true -- Option to show/hide Crafters tab
 -- Forward declaration for RebuildItemList
 local RebuildItemList
+-- Get localized item name using WoW API
+local function get_localized_item_name(itemData)
+    if itemData.id and Craftpad.Utils and Craftpad.Utils.GetItemName then
+        return Craftpad.Utils.GetItemName(itemData.id, itemData.name)
+    end
+    return itemData.name
+end
 -- Get total item count across bags, bank, and warband bank
-local function get_total_item_count(itemName)
+-- Supports both itemID (preferred) and itemName (fallback)
+local function get_total_item_count(itemNameOrID)
     -- Try modern API first (TWW - includes account bank)
     if C_Item and C_Item.GetItemCount then
-        return C_Item.GetItemCount(itemName, true, false, false, true) or 0
+        return C_Item.GetItemCount(itemNameOrID, true, false, false, true) or 0
     end
     -- Fallback for older versions
-    return GetItemCount(itemName, true) or 0
+    return GetItemCount(itemNameOrID, true) or 0
 end
 -- Filter items based on search text (delegates to Search module)
 local function FilterItems(searchText)
@@ -241,14 +249,18 @@ function Craftpad.UI.CreateMainFrame()
         -- Item name
         local itemName = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         itemName:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
-        itemName:SetText(itemData.name)
+        itemName:SetText(get_localized_item_name(itemData))
         itemName:SetWidth(DETAIL_WIDTH - 30)
         itemName:SetWordWrap(true)
         yOffset = yOffset - 35
         -- Category
         local categoryText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         categoryText:SetPoint("TOP", tabScroll, "TOP", 0, yOffset)
-        categoryText:SetText("Category: " .. itemData.category)
+        local localizedCategory = itemData.category
+        if Craftpad.L10n and Craftpad.L10n.GetCategory then
+            localizedCategory = Craftpad.L10n.GetCategory(itemData.category)
+        end
+        categoryText:SetText("Category: " .. localizedCategory)
         categoryText:SetTextColor(0.8, 0.8, 0.8, 1)
         yOffset = yOffset - 25
         -- Item ID
@@ -288,7 +300,11 @@ function Craftpad.UI.CreateMainFrame()
         -- Profession name and rank
         local profText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         profText:SetPoint("LEFT", profIcon, "RIGHT", 10, 0)
-        profText:SetText(itemData.profession.name .. " (Rank " .. itemData.profession.rank .. ")")
+        local localizedProfession = itemData.profession.name
+        if Craftpad.L10n and Craftpad.L10n.GetProfession then
+            localizedProfession = Craftpad.L10n.GetProfession(itemData.profession.name)
+        end
+        profText:SetText(localizedProfession .. " (Rank " .. itemData.profession.rank .. ")")
         yOffset = yOffset - 35
         -- Separator
         local separator = tabScroll:CreateTexture(nil, "ARTWORK")
@@ -309,11 +325,18 @@ function Craftpad.UI.CreateMainFrame()
             reagentIcon:SetSize(20, 20)
             reagentIcon:SetPoint("TOPLEFT", tabScroll, "TOPLEFT", 20, yOffset)
             reagentIcon:SetTexture("Interface\\Icons\\" .. reagent.icon)
-            local currentCount = get_total_item_count(reagent.name)
+            -- Use itemID if available, otherwise fall back to name
+            local itemIdentifier = reagent.itemID or reagent.name
+            local currentCount = get_total_item_count(itemIdentifier)
             local requiredCount = reagent.quantity
+            -- Get localized reagent name
+            local reagentName = reagent.name
+            if reagent.itemID and Craftpad.Utils and Craftpad.Utils.GetItemName then
+                reagentName = Craftpad.Utils.GetItemName(reagent.itemID, reagent.name)
+            end
             local reagentText = tabScroll:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             reagentText:SetPoint("LEFT", reagentIcon, "RIGHT", 8, 0)
-            reagentText:SetText(reagent.name .. " " .. currentCount .. "/" .. requiredCount)
+            reagentText:SetText(reagentName .. " " .. currentCount .. "/" .. requiredCount)
             reagentText:SetWidth(DETAIL_WIDTH - REAGENT_ICON_MARGIN)
             reagentText:SetJustifyH("LEFT")
             if currentCount >= requiredCount then
@@ -436,7 +459,7 @@ function Craftpad.UI.CreateMainFrame()
         -- Name text
         local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-        text:SetText(item.name)
+        text:SetText(get_localized_item_name(item))
         text:SetJustifyH("LEFT")
         text:SetWidth(LIST_WIDTH - 100)
         -- Hover effect
