@@ -40,8 +40,8 @@ function Craftpad.Utils.GetItemName(itemID, fallbackName)
 end
 
 -- Get localized item name using modern Item API (TWW)
--- This function is for compatibility with newer WoW versions that prefer C_Item API
--- Use GetItemName() for most cases - it automatically tries modern API first
+-- Use this for compatibility with The War Within and newer expansions
+-- For general use, GetItemName() works with classic API which is widely supported
 -- @param itemID number The WoW item ID
 -- @param fallbackName string Optional fallback name if item not found
 -- @return string The localized item name in client's locale, or fallback/empty string
