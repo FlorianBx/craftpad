@@ -54,4 +54,27 @@ _G.GameTooltip = {
 -- Mock print function for tests
 _G.print = function(...) end
 
+-- Mock item info functions
+_G.GetItemInfo = function(itemID)
+    return nil  -- Default returns nil, tests can override
+end
+
+_G.GetItemCount = function(itemNameOrID, includeBank)
+    return 0
+end
+
+_G.C_Item = {
+    GetItemCount = function(itemNameOrID, includeBank, includeUses, includeReagentBank, includeAccountBank)
+        return 0
+    end,
+    GetItemInfo = function(itemID)
+        return nil
+    end,
+}
+
+-- Mock localization
+_G.GetLocale = function()
+    return "enUS"
+end
+
 return WowApiMock
