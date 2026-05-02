@@ -56,7 +56,7 @@ local function get_total_item_count(itemNameOrID)
 
     if itemID then
         -- ID path: fully locale-independent, includes all storage
-        local count = 0
+        local count
         if C_Item and C_Item.GetItemCount then
             -- includeBank=true, includeUses=false, includeReagentBank=false, includeWarband=true
             count = C_Item.GetItemCount(itemID, true, false, false, true) or 0

@@ -13,6 +13,10 @@ read_globals = {
     "unpack",
     -- Profession API
     "GetProfessions", "GetProfessionInfo",
+    -- Trade skill / profession expansion API (Dragonflight+)
+    "C_TradeSkillUI",
+    -- Container / bag API
+    "C_Container",
     -- Community/Chat API
     "C_Club", "C_ChatInfo",
     -- Timer API
